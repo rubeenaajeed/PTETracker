@@ -1,0 +1,2123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PTE Academic Tracker & Learning Platform</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .card-shadow { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
+        .recording { animation: pulse 1.5s ease-in-out infinite; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // ==================== DATA STORAGE ====================
+        const StorageManager = {
+            saveData: (key, data) => {
+                try {
+                    localStorage.setItem(key, JSON.stringify(data));
+                } catch (e) {
+                    console.error('Storage error:', e);
+                }
+            },
+            getData: (key, defaultValue) => {
+                try {
+                    const data = localStorage.getItem(key);
+                    return data ? JSON.parse(data) : defaultValue;
+                } catch (e) {
+                    console.error('Retrieval error:', e);
+                    return defaultValue;
+                }
+            }
+        };
+
+        // ==================== PTE QUESTIONS DATABASE ====================
+        const PTE_QUESTIONS = {
+            speaking: {
+                readAloud: [
+                    { id: 1, text: "The Mediterranean climate is characterized by hot, dry summers and mild, wet winters. This weather pattern supports diverse agriculture including olives, grapes, and citrus fruits.", difficulty: "medium" },
+                    { id: 2, text: "Quantum mechanics fundamentally changed our understanding of atomic and subatomic particles, introducing concepts like wave-particle duality and uncertainty principles.", difficulty: "hard" },
+                    { id: 3, text: "Urban planning involves designing cities to accommodate population growth while maintaining sustainability and quality of life for residents.", difficulty: "easy" },
+                    { id: 4, text: "The Industrial Revolution transformed manufacturing processes through mechanization, leading to unprecedented economic growth and societal changes across Europe and North America.", difficulty: "medium" },
+                    { id: 5, text: "Biodiversity conservation requires coordinated efforts across nations to protect endangered species and preserve critical ecosystems for future generations.", difficulty: "hard" }
+                ],
+                repeatSentence: [
+                    { id: 1, audio: "The conference will be held next Tuesday.", difficulty: "easy" },
+                    { id: 2, audio: "Research indicates that regular exercise improves cognitive function.", difficulty: "medium" },
+                    { id: 3, audio: "The government announced new environmental regulations yesterday.", difficulty: "medium" },
+                    { id: 4, audio: "Students are encouraged to participate in extracurricular activities.", difficulty: "easy" },
+                    { id: 5, audio: "The pharmaceutical company is developing a groundbreaking treatment for the disease.", difficulty: "hard" }
+                ],
+                describeImage: [
+                    { 
+                        id: 1, 
+                        description: "Bar chart showing global smartphone sales from 2018-2023. Sales increased from 1.4 billion to 1.8 billion units. Highest growth in 2021.",
+                        difficulty: "medium",
+                        keywords: ["increase", "growth", "billion", "sales", "period"]
+                    },
+                    { 
+                        id: 2, 
+                        description: "Line graph depicting temperature changes over 100 years. Shows 1.5°C increase. Sharp rise after 1980.",
+                        difficulty: "hard",
+                        keywords: ["temperature", "increase", "period", "trend", "climate"]
+                    },
+                    { 
+                        id: 3, 
+                        description: "Pie chart showing university budget allocation: 40% salaries, 25% infrastructure, 20% research, 15% other.",
+                        difficulty: "easy",
+                        keywords: ["percentage", "largest", "allocation", "budget", "portion"]
+                    }
+                ],
+                retellLecture: [
+                    { 
+                        id: 1, 
+                        lecture: "Today's lecture covers renewable energy sources. Solar and wind power have become increasingly cost-effective. Many countries are transitioning away from fossil fuels. Government incentives support renewable adoption. Challenges include energy storage and grid infrastructure.",
+                        difficulty: "medium",
+                        keyPoints: ["renewable energy", "solar and wind", "cost-effective", "government incentives", "challenges"]
+                    },
+                    { 
+                        id: 2, 
+                        lecture: "The lecture discusses artificial intelligence in healthcare. AI assists in diagnosis and treatment planning. Machine learning analyzes medical images with high accuracy. Privacy concerns need addressing. Future applications include personalized medicine.",
+                        difficulty: "hard",
+                        keyPoints: ["AI in healthcare", "diagnosis", "machine learning", "privacy", "personalized medicine"]
+                    }
+                ],
+                answerShortQuestion: [
+                    { id: 1, question: "What do we call the science of studying weather?", answer: "Meteorology", difficulty: "easy" },
+                    { id: 2, question: "What is the opposite of 'zenith'?", answer: "Nadir", difficulty: "hard" },
+                    { id: 3, question: "How many days are there in a leap year?", answer: "366", difficulty: "easy" },
+                    { id: 4, question: "What do we call a person who studies ancient civilizations?", answer: "Archaeologist", difficulty: "medium" },
+                    { id: 5, question: "What is the main gas in Earth's atmosphere?", answer: "Nitrogen", difficulty: "medium" }
+                ]
+            },
+            writing: {
+                summarizeText: [
+                    {
+                        id: 1,
+                        text: "Climate change is one of the most pressing issues facing humanity today. Rising global temperatures are causing ice caps to melt, sea levels to rise, and weather patterns to become increasingly unpredictable. Scientists worldwide agree that human activities, particularly the burning of fossil fuels, are the primary drivers of this phenomenon. The consequences are far-reaching, affecting ecosystems, agriculture, and human settlements. Immediate action is required to reduce carbon emissions and transition to renewable energy sources. International cooperation is essential to address this global challenge effectively. Without significant changes in policy and behavior, the impacts will become irreversible.",
+                        difficulty: "medium",
+                        wordLimit: "5-75 words"
+                    },
+                    {
+                        id: 2,
+                        text: "The digital revolution has transformed how we communicate, work, and access information. Social media platforms connect billions of people worldwide, enabling instant communication across vast distances. However, this connectivity comes with challenges including privacy concerns, misinformation, and digital addiction. Studies show that excessive social media use can negatively impact mental health, particularly among young people. Companies collect vast amounts of user data, raising questions about privacy and data security. Despite these concerns, digital technology continues to advance rapidly, with artificial intelligence and virtual reality representing the next frontier. Balancing innovation with ethical considerations remains a critical challenge for society.",
+                        difficulty: "hard",
+                        wordLimit: "5-75 words"
+                    },
+                    {
+                        id: 3,
+                        text: "Exercise is essential for maintaining physical and mental health. Regular physical activity strengthens the cardiovascular system, improves muscle tone, and helps maintain a healthy weight. Beyond physical benefits, exercise releases endorphins that improve mood and reduce stress. Health professionals recommend at least 150 minutes of moderate exercise per week. Activities can include walking, swimming, cycling, or team sports. Starting with small, manageable goals can help establish a sustainable exercise routine.",
+                        difficulty: "easy",
+                        wordLimit: "5-75 words"
+                    }
+                ],
+                writeEssay: [
+                    {
+                        id: 1,
+                        prompt: "Some people think that environmental problems are too big for individuals to solve, and that only governments and large companies can make a difference. To what extent do you agree or disagree?",
+                        difficulty: "medium",
+                        wordLimit: "200-300 words",
+                        timeLimit: 20
+                    },
+                    {
+                        id: 2,
+                        prompt: "In many countries, the proportion of older people is steadily increasing. Does this trend have more positive or negative effects on society?",
+                        difficulty: "medium",
+                        wordLimit: "200-300 words",
+                        timeLimit: 20
+                    },
+                    {
+                        id: 3,
+                        prompt: "Some universities now offer their courses on the Internet so that people can study online. Is this a positive or negative development?",
+                        difficulty: "medium",
+                        wordLimit: "200-300 words",
+                        timeLimit: 20
+                    },
+                    {
+                        id: 4,
+                        prompt: "The role of technology in education has been debated extensively. While some argue that technology enhances learning, others believe it creates distractions and reduces face-to-face interaction. Discuss both views and give your own opinion.",
+                        difficulty: "hard",
+                        wordLimit: "200-300 words",
+                        timeLimit: 20
+                    }
+                ]
+            },
+            reading: {
+                multipleChoiceSingle: [
+                    {
+                        id: 1,
+                        passage: "The concept of sustainable development gained prominence in 1987 with the Brundtland Report, which defined it as 'development that meets the needs of the present without compromising the ability of future generations to meet their own needs.' This definition highlights the importance of balancing economic growth with environmental protection and social equity.",
+                        question: "According to the passage, sustainable development primarily focuses on:",
+                        options: [
+                            "Maximizing current economic growth",
+                            "Balancing present needs with future capabilities",
+                            "Prioritizing environmental concerns over economics",
+                            "Reducing population growth"
+                        ],
+                        correctAnswer: 1,
+                        difficulty: "medium"
+                    },
+                    {
+                        id: 2,
+                        passage: "Photosynthesis is the process by which plants convert light energy into chemical energy. Chlorophyll, the green pigment in plants, absorbs light primarily in the blue and red wavelengths while reflecting green light, which is why plants appear green to our eyes. This process is fundamental to life on Earth as it produces oxygen and forms the base of most food chains.",
+                        question: "Plants appear green because chlorophyll:",
+                        options: [
+                            "Absorbs green light wavelengths",
+                            "Reflects green light wavelengths",
+                            "Produces green light during photosynthesis",
+                            "Converts green light into chemical energy"
+                        ],
+                        correctAnswer: 1,
+                        difficulty: "easy"
+                    }
+                ],
+                multipleChoiceMultiple: [
+                    {
+                        id: 1,
+                        passage: "The gig economy has transformed traditional employment patterns. Workers enjoy flexibility and autonomy, choosing when and where to work. However, they often lack job security, health benefits, and retirement plans that traditional employment provides. This shift has prompted debates about worker rights and the need for updated labor laws.",
+                        question: "According to the passage, which of the following are characteristics of gig economy work? (Select all that apply)",
+                        options: [
+                            "Flexible working hours",
+                            "Guaranteed health benefits",
+                            "Lack of job security",
+                            "Fixed retirement plans",
+                            "Worker autonomy"
+                        ],
+                        correctAnswers: [0, 2, 4],
+                        difficulty: "medium"
+                    }
+                ],
+                reorderParagraphs: [
+                    {
+                        id: 1,
+                        sentences: [
+                            "Finally, the mixture is baked at 180 degrees for 30 minutes.",
+                            "First, combine flour, sugar, and eggs in a large bowl.",
+                            "Then, add milk gradually while stirring continuously.",
+                            "Next, pour the batter into a greased pan."
+                        ],
+                        correctOrder: [1, 2, 3, 0],
+                        difficulty: "easy"
+                    },
+                    {
+                        id: 2,
+                        sentences: [
+                            "These observations led to the development of the theory of evolution.",
+                            "Darwin noticed that species on different islands had adapted to their specific environments.",
+                            "Consequently, natural selection became recognized as the mechanism driving evolutionary change.",
+                            "During his voyage on the Beagle, Darwin studied various species across multiple locations."
+                        ],
+                        correctOrder: [3, 1, 0, 2],
+                        difficulty: "hard"
+                    }
+                ],
+                fillBlanksReading: [
+                    {
+                        id: 1,
+                        text: "The ____ of globalization has ____ both opportunities and challenges for developing nations. While increased trade can ____ economic growth, it may also lead to cultural ____ and environmental concerns.",
+                        blanks: [
+                            { position: 0, options: ["process", "rejection", "decline", "isolation"], correct: 0 },
+                            { position: 1, options: ["eliminated", "created", "reduced", "prevented"], correct: 1 },
+                            { position: 2, options: ["hinder", "stop", "boost", "freeze"], correct: 2 },
+                            { position: 3, options: ["preservation", "homogenization", "diversity", "uniqueness"], correct: 1 }
+                        ],
+                        difficulty: "medium"
+                    }
+                ],
+                fillBlanksReadingWriting: [
+                    {
+                        id: 1,
+                        text: "Scientists have discovered that regular meditation can ____ reduce stress levels and improve cognitive function. The practice ____ focused attention and deep breathing, which activates the parasympathetic nervous system. Studies ____ that even brief daily sessions can produce measurable benefits.",
+                        options: ["significantly", "involves", "indicate", "rarely", "excludes", "deny"],
+                        correctAnswers: ["significantly", "involves", "indicate"],
+                        difficulty: "medium"
+                    }
+                ]
+            },
+            listening: {
+                summarizeSpokenText: [
+                    {
+                        id: 1,
+                        audio: "The lecture discusses the importance of coral reefs in marine ecosystems. Coral reefs support approximately 25% of all marine species despite covering less than 1% of the ocean floor. They provide habitat, breeding grounds, and food sources for countless organisms. Unfortunately, coral reefs face serious threats from climate change, ocean acidification, and pollution. Rising ocean temperatures cause coral bleaching, where corals expel their symbiotic algae. Without immediate conservation efforts, many reefs may disappear within decades. Protecting these vital ecosystems requires global cooperation and local action.",
+                        difficulty: "medium",
+                        wordLimit: "50-70 words"
+                    },
+                    {
+                        id: 2,
+                        audio: "Today's lecture examines the impact of urbanization on public health. As cities grow, they create both opportunities and challenges for health outcomes. Urban areas typically offer better access to healthcare facilities, education, and employment. However, they also face issues like air pollution, noise, overcrowding, and limited green spaces. These factors contribute to respiratory diseases, stress, and mental health problems. City planners must consider health implications when designing urban infrastructure. Incorporating parks, pedestrian zones, and public transportation can significantly improve urban health outcomes.",
+                        difficulty: "hard",
+                        wordLimit: "50-70 words"
+                    }
+                ],
+                multipleChoiceListening: [
+                    {
+                        id: 1,
+                        audio: "The university library will be closed for renovations starting next month. During this period, students can access resources through the online portal. Physical books can be requested for delivery to the student center. The renovation is expected to take three months.",
+                        question: "What is the main purpose of this announcement?",
+                        options: [
+                            "To introduce new library services",
+                            "To inform about temporary library closure",
+                            "To encourage online resource usage",
+                            "To announce extended library hours"
+                        ],
+                        correctAnswer: 1,
+                        difficulty: "easy"
+                    }
+                ],
+                fillBlanksListening: [
+                    {
+                        id: 1,
+                        audio: "The research indicates that sleep deprivation has significant effects on cognitive performance. Participants who slept fewer than six hours showed reduced attention spans and impaired decision-making abilities. Memory consolidation also suffers when sleep duration is inadequate.",
+                        text: "Sleep deprivation causes ____ in cognitive performance, particularly affecting ____ spans and ____ abilities. ____ consolidation is also negatively impacted.",
+                        correctAnswers: ["significant effects", "attention", "decision-making", "Memory"],
+                        difficulty: "medium"
+                    }
+                ],
+                highlightCorrectSummary: [
+                    {
+                        id: 1,
+                        audio: "Electric vehicles are becoming increasingly popular as concerns about climate change grow. Modern EVs offer impressive range and performance while producing zero direct emissions. Battery technology improvements have reduced costs and increased efficiency. Governments worldwide are supporting EV adoption through incentives and charging infrastructure development.",
+                        summaries: [
+                            "Electric vehicles are expensive and have limited range, making them impractical for most consumers despite government incentives.",
+                            "Growing climate concerns have boosted EV popularity. Modern EVs offer good range and zero emissions. Battery improvements and government support are driving adoption.",
+                            "Electric vehicles are identical to gasoline cars except for their power source. They require no special infrastructure or government support.",
+                            "Only wealthy individuals can afford electric vehicles, which remain a luxury product rather than a practical transportation solution."
+                        ],
+                        correctAnswer: 1,
+                        difficulty: "medium"
+                    }
+                ],
+                selectMissingWord: [
+                    {
+                        id: 1,
+                        audio: "The scientific method involves several key steps. First, researchers observe a phenomenon and ask questions. Then they form a hypothesis, which is a testable explanation. Next comes experimentation to test the hypothesis. Finally, researchers analyze results and draw ____.",
+                        options: ["predictions", "conclusions", "observations", "questions"],
+                        correctAnswer: 1,
+                        difficulty: "easy"
+                    }
+                ],
+                highlightIncorrectWords: [
+                    {
+                        id: 1,
+                        audio: "The Amazon rainforest produces approximately 20% of the world's oxygen and houses incredible biodiversity.",
+                        transcript: "The Amazon rainforest produces approximately 30% of the world's carbon and houses limited biodiversity.",
+                        incorrectWords: [4, 9, 12],
+                        difficulty: "medium"
+                    }
+                ],
+                writeFromDictation: [
+                    { id: 1, audio: "Technology has revolutionized modern communication.", difficulty: "easy" },
+                    { id: 2, audio: "Environmental sustainability requires collective action.", difficulty: "medium" },
+                    { id: 3, audio: "The university offers comprehensive scholarship programs.", difficulty: "easy" },
+                    { id: 4, audio: "Economic indicators suggest gradual recovery.", difficulty: "medium" },
+                    { id: 5, audio: "Interdisciplinary research yields innovative solutions.", difficulty: "hard" }
+                ]
+            }
+        };
+
+        // ==================== VOCABULARY DATABASE ====================
+        const VOCABULARY_WORDS = [
+            { word: "Ubiquitous", definition: "Present everywhere; widespread", example: "Smartphones have become ubiquitous in modern society.", category: "Academic", difficulty: "hard" },
+            { word: "Mitigate", definition: "Make less severe or serious", example: "Governments must mitigate the effects of climate change.", category: "Academic", difficulty: "medium" },
+            { word: "Substantial", definition: "Considerable in importance or size", example: "There has been substantial progress in medical research.", category: "Academic", difficulty: "medium" },
+            { word: "Comprehensive", definition: "Complete; including all elements", example: "The study provides a comprehensive analysis of the data.", category: "Academic", difficulty: "medium" },
+            { word: "Feasible", definition: "Possible to do easily or conveniently", example: "The proposed solution is both practical and feasible.", category: "Academic", difficulty: "medium" },
+            { word: "Deteriorate", definition: "Become progressively worse", example: "Air quality continues to deteriorate in urban areas.", category: "Academic", difficulty: "medium" },
+            { word: "Implement", definition: "Put into effect; execute", example: "The company will implement new policies next month.", category: "Academic", difficulty: "easy" },
+            { word: "Paradigm", definition: "A typical example or pattern", example: "The digital revolution created a new paradigm in communication.", category: "Academic", difficulty: "hard" },
+            { word: "Inadequate", definition: "Not sufficient; lacking", example: "The current funding is inadequate for the project.", category: "Academic", difficulty: "medium" },
+            { word: "Ambiguous", definition: "Open to multiple interpretations; unclear", example: "The politician's statement was deliberately ambiguous.", category: "Academic", difficulty: "hard" },
+            { word: "Prevalent", definition: "Widespread in a particular area", example: "Flu is prevalent during winter months.", category: "Academic", difficulty: "medium" },
+            { word: "Endorse", definition: "Declare support for; approve", example: "Many experts endorse this approach to education.", category: "Academic", difficulty: "medium" },
+            { word: "Constraints", definition: "Limitations or restrictions", example: "Budget constraints affected the research project.", category: "Academic", difficulty: "medium" },
+            { word: "Advocate", definition: "Publicly support or recommend", example: "Scientists advocate for sustainable energy solutions.", category: "Academic", difficulty: "medium" },
+            { word: "Indigenous", definition: "Native to a particular place", example: "Indigenous communities have unique cultural traditions.", category: "Academic", difficulty: "hard" },
+            { word: "Resilient", definition: "Able to recover quickly from difficulties", example: "The economy proved resilient after the crisis.", category: "Academic", difficulty: "medium" },
+            { word: "Arbitrary", definition: "Based on random choice rather than reason", example: "The decision seemed arbitrary and unfair.", category: "Academic", difficulty: "hard" },
+            { word: "Coherent", definition: "Logical and consistent", example: "The essay presents a coherent argument.", category: "Academic", difficulty: "medium" }
+        ];
+
+        // ==================== STUDY RESOURCES ====================
+        const STUDY_RESOURCES = {
+            speaking: {
+                tips: [
+                    "Speak clearly and at a moderate pace - don't rush",
+                    "Use proper intonation and stress on key words",
+                    "Practice pronunciation of difficult words daily",
+                    "Record yourself and listen back to identify areas for improvement",
+                    "For Describe Image: Follow the structure - Introduction, Main points, Conclusion",
+                    "For Retell Lecture: Take notes on key points, names, dates, and statistics"
+                ],
+                templates: {
+                    describeImage: "This [graph/chart/image] shows/illustrates... The main feature is... According to the data... In conclusion...",
+                    retellLecture: "The lecture discusses... The speaker mentioned that... Key points include... In summary..."
+                }
+            },
+            writing: {
+                tips: [
+                    "Plan before writing - spend 2-3 minutes outlining",
+                    "Use formal academic language - avoid contractions",
+                    "Include clear topic sentences for each paragraph",
+                    "Support arguments with examples and evidence",
+                    "Check grammar, spelling, and punctuation",
+                    "Stay within word limits - penalties apply for over/under"
+                ],
+                essayStructure: "Introduction (40-50 words): Hook + Background + Thesis\nBody Paragraph 1 (80-100 words): Topic sentence + Explanation + Example\nBody Paragraph 2 (80-100 words): Topic sentence + Explanation + Example\nConclusion (40-50 words): Restate thesis + Summary + Final thought",
+                summaryTips: "Include main idea only. Use one sentence if possible. Stay within 5-75 words. Use your own words - don't copy from text."
+            },
+            reading: {
+                tips: [
+                    "Skim the passage first to understand the main idea",
+                    "Read questions carefully before searching for answers",
+                    "Manage time - spend max 2-3 minutes per question",
+                    "For Fill in Blanks: Read surrounding sentences for context",
+                    "For Reorder: Look for linking words (however, therefore, moreover)",
+                    "Eliminate obviously wrong answers in multiple choice"
+                ],
+                strategies: "Speed reading: Train to read 250-300 words per minute. Scanning: Quickly locate specific information. Skimming: Understand general meaning without reading every word."
+            },
+            listening: {
+                tips: [
+                    "Take notes while listening - use abbreviations",
+                    "Focus on key words, names, dates, and numbers",
+                    "Don't panic if you miss something - keep listening",
+                    "For Summarize Spoken Text: Note main idea and 2-3 supporting points",
+                    "For Write from Dictation: Write exactly what you hear",
+                    "Practice with podcasts and TED talks daily"
+                ],
+                noteTaking: "Use symbols: → (leads to), ↑ (increase), ↓ (decrease), = (equals). Abbreviate: govt (government), edu (education), tech (technology)."
+            },
+            grammar: [
+                {
+                    topic: "Subject-Verb Agreement",
+                    rule: "Subjects and verbs must agree in number (singular/plural)",
+                    examples: ["Correct: The list of items IS on the desk", "Incorrect: The list of items ARE on the desk"],
+                    practice: "The team [has/have] won the championship. (Answer: has)"
+                },
+                {
+                    topic: "Articles (a, an, the)",
+                    rule: "Use 'a' before consonants, 'an' before vowels, 'the' for specific items",
+                    examples: ["A university (sounds like 'you')", "An hour (silent 'h')", "The book I mentioned"],
+                    practice: "I need [a/an] ____ umbrella. (Answer: an)"
+                },
+                {
+                    topic: "Conditionals",
+                    rule: "Zero: If + present, present. First: If + present, will. Second: If + past, would",
+                    examples: ["If you heat water, it boils (fact)", "If it rains, I will stay home (likely)", "If I were rich, I would travel (hypothetical)"],
+                    practice: "If I ____ more time, I would exercise daily. (Answer: had)"
+                },
+                {
+                    topic: "Relative Clauses",
+                    rule: "Who (people), Which (things), That (people/things), Where (places)",
+                    examples: ["The woman WHO called is my sister", "The book WHICH I read was interesting", "The place WHERE we met"],
+                    practice: "The student ____ scored highest will receive an award. (Answer: who)"
+                }
+            ]
+        };
+
+        // ==================== MAIN APP ====================
+        function PTETracker() {
+            const [currentSection, setCurrentSection] = useState('dashboard');
+            const [user, setUser] = useState({ name: 'Student', targetScore: 8, deadline: '2026-06-01' });
+            const [scores, setScores] = useState([]);
+            const [practiceHistory, setPracticeHistory] = useState([]);
+            const [vocabularyProgress, setVocabularyProgress] = useState({});
+            const [studySchedule, setStudySchedule] = useState([]);
+            const [currentPractice, setCurrentPractice] = useState(null);
+            const [isRecording, setIsRecording] = useState(false);
+            const [recordedAudio, setRecordedAudio] = useState(null);
+            const [userAnswer, setUserAnswer] = useState('');
+            const [practiceResult, setPracticeResult] = useState(null);
+            const [isEvaluating, setIsEvaluating] = useState(false);
+
+            const mediaRecorderRef = useRef(null);
+            const audioChunksRef = useRef([]);
+
+            useEffect(() => {
+                loadUserData();
+            }, []);
+
+            const loadUserData = () => {
+                const savedScores = StorageManager.getData('pte_scores', []);
+                const savedHistory = StorageManager.getData('pte_history', []);
+                const savedVocab = StorageManager.getData('pte_vocabulary', {});
+                const savedSchedule = StorageManager.getData('pte_schedule', []);
+                
+                setScores(savedScores);
+                setPracticeHistory(savedHistory);
+                setVocabularyProgress(savedVocab);
+                setStudySchedule(savedSchedule);
+            };
+
+            const saveScore = (section, score, details) => {
+                const newScore = {
+                    id: Date.now(),
+                    section,
+                    score,
+                    details,
+                    date: new Date().toISOString()
+                };
+                const updatedScores = [...scores, newScore];
+                setScores(updatedScores);
+                StorageManager.saveData('pte_scores', updatedScores);
+            };
+
+            const savePracticeHistory = (practice) => {
+                const updatedHistory = [...practiceHistory, practice];
+                setPracticeHistory(updatedHistory);
+                StorageManager.saveData('pte_history', updatedHistory);
+            };
+
+            // ==================== RECORDING FUNCTIONS ====================
+            const startRecording = async () => {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorderRef.current = new MediaRecorder(stream);
+                    audioChunksRef.current = [];
+
+                    mediaRecorderRef.current.ondataavailable = (event) => {
+                        audioChunksRef.current.push(event.data);
+                    };
+
+                    mediaRecorderRef.current.onstop = () => {
+                        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+                        const audioUrl = URL.createObjectURL(audioBlob);
+                        setRecordedAudio(audioUrl);
+                    };
+
+                    mediaRecorderRef.current.start();
+                    setIsRecording(true);
+                } catch (error) {
+                    alert('Microphone access denied. Please allow microphone access to record your speaking.');
+                }
+            };
+
+            const stopRecording = () => {
+                if (mediaRecorderRef.current && isRecording) {
+                    mediaRecorderRef.current.stop();
+                    mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+                    setIsRecording(false);
+                }
+            };
+
+            // ==================== AI EVALUATION ====================
+            const evaluateAnswer = async (questionType, question, answer, section) => {
+                setIsEvaluating(true);
+                
+                try {
+                    let prompt = '';
+                    
+                    if (section === 'speaking') {
+                        if (questionType === 'readAloud') {
+                            prompt = `Evaluate this PTE Read Aloud response. 
+
+Original text: "${question.text}"
+Student's spoken response: "${answer}"
+
+Grade on these criteria (0-10 scale):
+1. Content (Did they read all words?)
+2. Pronunciation (Clear articulation?)
+3. Oral Fluency (Smooth, natural pace?)
+
+Provide:
+- Overall score (0-90 scale)
+- Scores for each criterion
+- Specific feedback on pronunciation errors
+- Tips for improvement
+
+Respond in JSON format:
+{
+  "overallScore": number,
+  "contentScore": number,
+  "pronunciationScore": number,
+  "fluencyScore": number,
+  "feedback": "detailed feedback",
+  "strengths": ["strength1", "strength2"],
+  "improvements": ["improvement1", "improvement2"]
+}`;
+                        } else if (questionType === 'describeImage') {
+                            prompt = `Evaluate this PTE Describe Image response.
+
+Image description: "${question.description}"
+Student's response: "${answer}"
+Key points to cover: ${question.keywords.join(', ')}
+
+Grade on these criteria (0-10 scale):
+1. Content (Covered main features?)
+2. Form (Length 35-45 seconds?)
+3. Fluency (Smooth delivery?)
+4. Vocabulary (Appropriate words?)
+5. Grammar
+
+Provide overall score (0-90) and detailed feedback in JSON format.`;
+                        } else if (questionType === 'retellLecture') {
+                            prompt = `Evaluate this PTE Retell Lecture response.
+
+Lecture content: "${question.lecture}"
+Key points: ${question.keyPoints.join(', ')}
+Student's response: "${answer}"
+
+Grade on content coverage, fluency, pronunciation. Provide score (0-90) and feedback in JSON.`;
+                        }
+                    } else if (section === 'writing') {
+                        if (questionType === 'writeEssay') {
+                            prompt = `Evaluate this PTE Academic essay according to official PTE rubrics.
+
+Essay prompt: "${question.prompt}"
+Word limit: ${question.wordLimit}
+Student's essay: "${answer}"
+
+Grade on PTE criteria:
+1. Content (7 points): Task response, idea development, relevance
+2. Form (2 points): Length (200-300 words)
+3. Development, Structure, Coherence (2 points): Logical organization, clear progression
+4. Grammar (2 points): Grammatical accuracy, range
+5. Vocabulary (2 points): Range, accuracy, appropriateness
+6. Spelling (2 points)
+
+Provide:
+{
+  "overallScore": number (0-90),
+  "contentScore": number,
+  "formScore": number,
+  "coherenceScore": number,
+  "grammarScore": number,
+  "vocabularyScore": number,
+  "spellingScore": number,
+  "wordCount": number,
+  "feedback": "detailed paragraph",
+  "strengths": ["str1", "str2"],
+  "improvements": ["imp1", "imp2"],
+  "grammarErrors": ["error1", "error2"],
+  "vocabularySuggestions": ["sug1", "sug2"]
+}`;
+                        } else if (questionType === 'summarizeText') {
+                            prompt = `Evaluate this PTE Summarize Written Text response.
+
+Original text: "${question.text}"
+Word limit: ${question.wordLimit}
+Student's summary: "${answer}"
+
+Grade on:
+1. Content (Captures main idea?)
+2. Form (One sentence, 5-75 words?)
+3. Grammar
+4. Vocabulary
+
+Provide score (0-90) and detailed feedback in JSON format.`;
+                        }
+                    } else if (section === 'reading') {
+                        // Reading section evaluation
+                        prompt = `Evaluate this reading answer. Provide score and brief feedback in JSON.`;
+                    } else if (section === 'listening') {
+                        if (questionType === 'summarizeSpokenText') {
+                            prompt = `Evaluate this PTE Summarize Spoken Text response.
+
+Audio transcript: "${question.audio}"
+Word limit: ${question.wordLimit}
+Student's summary: "${answer}"
+
+Grade on content, form, grammar, vocabulary. Provide score (0-90) and feedback in JSON.`;
+                        }
+                    }
+
+                    const response = await fetch('https://api.anthropic.com/v1/messages', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            model: 'claude-sonnet-4-20250514',
+                            max_tokens: 1000,
+                            messages: [
+                                { role: 'user', content: prompt }
+                            ]
+                        })
+                    });
+
+                    const data = await response.json();
+                    const resultText = data.content[0].text;
+                    
+                    // Try to parse JSON response
+                    let evaluationResult;
+                    try {
+                        // Remove markdown code blocks if present
+                        const cleanedText = resultText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+                        evaluationResult = JSON.parse(cleanedText);
+                    } catch (e) {
+                        // If JSON parsing fails, create a basic result
+                        evaluationResult = {
+                            overallScore: 65,
+                            feedback: resultText,
+                            strengths: ['Good attempt'],
+                            improvements: ['Keep practicing']
+                        };
+                    }
+
+                    setPracticeResult(evaluationResult);
+                    
+                    // Save to history
+                    savePracticeHistory({
+                        section,
+                        questionType,
+                        score: evaluationResult.overallScore,
+                        date: new Date().toISOString(),
+                        answer,
+                        feedback: evaluationResult
+                    });
+
+                    // Save score
+                    saveScore(section, evaluationResult.overallScore, {
+                        questionType,
+                        feedback: evaluationResult
+                    });
+
+                } catch (error) {
+                    console.error('Evaluation error:', error);
+                    setPracticeResult({
+                        overallScore: 0,
+                        feedback: 'Error evaluating answer. Please try again.',
+                        strengths: [],
+                        improvements: []
+                    });
+                }
+                
+                setIsEvaluating(false);
+            };
+
+            // ==================== NAVIGATION ====================
+            const NavBar = () => (
+                <nav className="gradient-bg text-white shadow-lg sticky top-0 z-50">
+                    <div className="max-w-7xl mx-auto px-4">
+                        <div className="flex items-center justify-between h-16">
+                            <div className="flex items-center space-x-3">
+                                <div className="text-2xl font-bold">🎓</div>
+                                <div>
+                                    <div className="text-xl font-bold">PTE Academic Tracker</div>
+                                    <div className="text-xs opacity-90">Target: 8.0+ | Deadline: June 1, 2026</div>
+                                </div>
+                            </div>
+                            <div className="flex space-x-1">
+                                {['dashboard', 'practice', 'resources', 'vocabulary', 'planner', 'progress'].map(section => (
+                                    <button
+                                        key={section}
+                                        onClick={() => setCurrentSection(section)}
+                                        className={`px-4 py-2 rounded-lg transition ${
+                                            currentSection === section 
+                                                ? 'bg-white text-purple-700 font-semibold' 
+                                                : 'hover:bg-purple-600'
+                                        }`}
+                                    >
+                                        {section.charAt(0).toUpperCase() + section.slice(1)}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </nav>
+            );
+
+            // ==================== DASHBOARD ====================
+            const Dashboard = () => {
+                const daysUntilDeadline = Math.ceil((new Date('2026-06-01') - new Date()) / (1000 * 60 * 60 * 24));
+                const averageScore = scores.length > 0 
+                    ? (scores.reduce((sum, s) => sum + s.score, 0) / scores.length).toFixed(1)
+                    : 0;
+
+                const sectionScores = {
+                    speaking: scores.filter(s => s.section === 'speaking'),
+                    writing: scores.filter(s => s.section === 'writing'),
+                    reading: scores.filter(s => s.section === 'reading'),
+                    listening: scores.filter(s => s.section === 'listening')
+                };
+
+                const avgBySection = Object.keys(sectionScores).reduce((acc, section) => {
+                    const sectionAvg = sectionScores[section].length > 0
+                        ? (sectionScores[section].reduce((sum, s) => sum + s.score, 0) / sectionScores[section].length).toFixed(1)
+                        : 0;
+                    acc[section] = sectionAvg;
+                    return acc;
+                }, {});
+
+                return (
+                    <div className="max-w-7xl mx-auto px-4 py-8">
+                        <div className="mb-8">
+                            <h1 className="text-4xl font-bold text-gray-800 mb-2">Welcome to Your PTE Journey! 🚀</h1>
+                            <p className="text-gray-600">Let's achieve that 8.0+ score together!</p>
+                        </div>
+
+                        {/* Key Metrics */}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                            <div className="bg-white p-6 rounded-xl card-shadow">
+                                <div className="text-3xl mb-2">⏰</div>
+                                <div className="text-2xl font-bold text-purple-600">{daysUntilDeadline}</div>
+                                <div className="text-sm text-gray-600">Days Until Exam</div>
+                            </div>
+                            <div className="bg-white p-6 rounded-xl card-shadow">
+                                <div className="text-3xl mb-2">🎯</div>
+                                <div className="text-2xl font-bold text-green-600">{averageScore}</div>
+                                <div className="text-sm text-gray-600">Current Average</div>
+                            </div>
+                            <div className="bg-white p-6 rounded-xl card-shadow">
+                                <div className="text-3xl mb-2">📊</div>
+                                <div className="text-2xl font-bold text-blue-600">{scores.length}</div>
+                                <div className="text-sm text-gray-600">Practice Tests</div>
+                            </div>
+                            <div className="bg-white p-6 rounded-xl card-shadow">
+                                <div className="text-3xl mb-2">💪</div>
+                                <div className="text-2xl font-bold text-orange-600">{practiceHistory.length}</div>
+                                <div className="text-sm text-gray-600">Total Practices</div>
+                            </div>
+                        </div>
+
+                        {/* Section Scores */}
+                        <div className="bg-white p-6 rounded-xl card-shadow mb-8">
+                            <h2 className="text-2xl font-bold mb-6">Section Performance</h2>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                {Object.entries(avgBySection).map(([section, avg]) => (
+                                    <div key={section} className="text-center p-4 bg-gray-50 rounded-lg">
+                                        <div className="text-xl font-bold capitalize mb-1">{section}</div>
+                                        <div className={`text-3xl font-bold ${avg >= 8 ? 'text-green-600' : avg >= 6.5 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                            {avg || '-'}
+                                        </div>
+                                        <div className="text-xs text-gray-500 mt-1">
+                                            {avg >= 8 ? '✅ Target Met!' : avg >= 6.5 ? '📈 Almost There' : '💪 Keep Going'}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Quick Actions */}
+                        <div className="bg-white p-6 rounded-xl card-shadow">
+                            <h2 className="text-2xl font-bold mb-6">Quick Actions</h2>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <button
+                                    onClick={() => setCurrentSection('practice')}
+                                    className="p-6 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl hover:from-purple-600 hover:to-purple-700 transition"
+                                >
+                                    <div className="text-3xl mb-2">🎤</div>
+                                    <div className="font-bold mb-1">Start Practice</div>
+                                    <div className="text-sm opacity-90">Begin your 30-min session</div>
+                                </button>
+                                <button
+                                    onClick={() => setCurrentSection('resources')}
+                                    className="p-6 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 transition"
+                                >
+                                    <div className="text-3xl mb-2">📚</div>
+                                    <div className="font-bold mb-1">Study Resources</div>
+                                    <div className="text-sm opacity-90">Tips & strategies</div>
+                                </button>
+                                <button
+                                    onClick={() => setCurrentSection('vocabulary')}
+                                    className="p-6 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl hover:from-green-600 hover:to-green-700 transition"
+                                >
+                                    <div className="text-3xl mb-2">📖</div>
+                                    <div className="font-bold mb-1">Build Vocabulary</div>
+                                    <div className="text-sm opacity-90">Master key words</div>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Recent Activity */}
+                        {practiceHistory.length > 0 && (
+                            <div className="bg-white p-6 rounded-xl card-shadow mt-8">
+                                <h2 className="text-2xl font-bold mb-4">Recent Practice</h2>
+                                <div className="space-y-3">
+                                    {practiceHistory.slice(-5).reverse().map((practice, idx) => (
+                                        <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                            <div>
+                                                <div className="font-semibold capitalize">{practice.section} - {practice.questionType}</div>
+                                                <div className="text-sm text-gray-600">{new Date(practice.date).toLocaleDateString()}</div>
+                                            </div>
+                                            <div className={`text-2xl font-bold ${practice.score >= 8 ? 'text-green-600' : 'text-yellow-600'}`}>
+                                                {practice.score}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+            };
+
+            // ==================== PRACTICE MODE ====================
+            const PracticeMode = () => {
+                const startPractice = (section, questionType) => {
+                    let questions;
+                    if (section === 'speaking') {
+                        questions = PTE_QUESTIONS.speaking[questionType];
+                    } else if (section === 'writing') {
+                        questions = PTE_QUESTIONS.writing[questionType];
+                    } else if (section === 'reading') {
+                        questions = PTE_QUESTIONS.reading[questionType];
+                    } else if (section === 'listening') {
+                        questions = PTE_QUESTIONS.listening[questionType];
+                    }
+                    
+                    const randomQuestion = questions[Math.floor(Math.random() * questions.length)];
+                    setCurrentPractice({ section, questionType, question: randomQuestion });
+                    setUserAnswer('');
+                    setPracticeResult(null);
+                    setRecordedAudio(null);
+                };
+
+                const handleSubmit = () => {
+                    if (!userAnswer.trim() && !recordedAudio) {
+                        alert('Please provide an answer before submitting.');
+                        return;
+                    }
+                    evaluateAnswer(currentPractice.questionType, currentPractice.question, userAnswer, currentPractice.section);
+                };
+
+                const resetPractice = () => {
+                    setCurrentPractice(null);
+                    setUserAnswer('');
+                    setPracticeResult(null);
+                    setRecordedAudio(null);
+                };
+
+                if (!currentPractice) {
+                    return (
+                        <div className="max-w-7xl mx-auto px-4 py-8">
+                            <h1 className="text-4xl font-bold text-gray-800 mb-8">Practice Mode 🎯</h1>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* Speaking */}
+                                <div className="bg-white p-6 rounded-xl card-shadow">
+                                    <h2 className="text-2xl font-bold mb-4 flex items-center">
+                                        <span className="text-3xl mr-3">🎤</span>
+                                        Speaking
+                                    </h2>
+                                    <div className="space-y-2">
+                                        <button onClick={() => startPractice('speaking', 'readAloud')} className="w-full p-3 text-left bg-purple-50 hover:bg-purple-100 rounded-lg transition">
+                                            <div className="font-semibold">Read Aloud</div>
+                                            <div className="text-sm text-gray-600">Read text with clear pronunciation</div>
+                                        </button>
+                                        <button onClick={() => startPractice('speaking', 'repeatSentence')} className="w-full p-3 text-left bg-purple-50 hover:bg-purple-100 rounded-lg transition">
+                                            <div className="font-semibold">Repeat Sentence</div>
+                                            <div className="text-sm text-gray-600">Listen and repeat exactly</div>
+                                        </button>
+                                        <button onClick={() => startPractice('speaking', 'describeImage')} className="w-full p-3 text-left bg-purple-50 hover:bg-purple-100 rounded-lg transition">
+                                            <div className="font-semibold">Describe Image</div>
+                                            <div className="text-sm text-gray-600">Describe chart/graph in detail</div>
+                                        </button>
+                                        <button onClick={() => startPractice('speaking', 'retellLecture')} className="w-full p-3 text-left bg-purple-50 hover:bg-purple-100 rounded-lg transition">
+                                            <div className="font-semibold">Re-tell Lecture</div>
+                                            <div className="text-sm text-gray-600">Summarize lecture content</div>
+                                        </button>
+                                        <button onClick={() => startPractice('speaking', 'answerShortQuestion')} className="w-full p-3 text-left bg-purple-50 hover:bg-purple-100 rounded-lg transition">
+                                            <div className="font-semibold">Answer Short Question</div>
+                                            <div className="text-sm text-gray-600">Quick one-word answers</div>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Writing */}
+                                <div className="bg-white p-6 rounded-xl card-shadow">
+                                    <h2 className="text-2xl font-bold mb-4 flex items-center">
+                                        <span className="text-3xl mr-3">✍️</span>
+                                        Writing
+                                    </h2>
+                                    <div className="space-y-2">
+                                        <button onClick={() => startPractice('writing', 'summarizeText')} className="w-full p-3 text-left bg-blue-50 hover:bg-blue-100 rounded-lg transition">
+                                            <div className="font-semibold">Summarize Written Text</div>
+                                            <div className="text-sm text-gray-600">One sentence summary (5-75 words)</div>
+                                        </button>
+                                        <button onClick={() => startPractice('writing', 'writeEssay')} className="w-full p-3 text-left bg-blue-50 hover:bg-blue-100 rounded-lg transition">
+                                            <div className="font-semibold">Write Essay</div>
+                                            <div className="text-sm text-gray-600">200-300 word academic essay</div>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Reading */}
+                                <div className="bg-white p-6 rounded-xl card-shadow">
+                                    <h2 className="text-2xl font-bold mb-4 flex items-center">
+                                        <span className="text-3xl mr-3">📖</span>
+                                        Reading
+                                    </h2>
+                                    <div className="space-y-2">
+                                        <button onClick={() => startPractice('reading', 'multipleChoiceSingle')} className="w-full p-3 text-left bg-green-50 hover:bg-green-100 rounded-lg transition">
+                                            <div className="font-semibold">Multiple Choice (Single)</div>
+                                            <div className="text-sm text-gray-600">Choose one correct answer</div>
+                                        </button>
+                                        <button onClick={() => startPractice('reading', 'multipleChoiceMultiple')} className="w-full p-3 text-left bg-green-50 hover:bg-green-100 rounded-lg transition">
+                                            <div className="font-semibold">Multiple Choice (Multiple)</div>
+                                            <div className="text-sm text-gray-600">Choose all correct answers</div>
+                                        </button>
+                                        <button onClick={() => startPractice('reading', 'reorderParagraphs')} className="w-full p-3 text-left bg-green-50 hover:bg-green-100 rounded-lg transition">
+                                            <div className="font-semibold">Re-order Paragraphs</div>
+                                            <div className="text-sm text-gray-600">Arrange sentences logically</div>
+                                        </button>
+                                        <button onClick={() => startPractice('reading', 'fillBlanksReading')} className="w-full p-3 text-left bg-green-50 hover:bg-green-100 rounded-lg transition">
+                                            <div className="font-semibold">Fill in the Blanks (Reading)</div>
+                                            <div className="text-sm text-gray-600">Drag and drop words</div>
+                                        </button>
+                                        <button onClick={() => startPractice('reading', 'fillBlanksReadingWriting')} className="w-full p-3 text-left bg-green-50 hover:bg-green-100 rounded-lg transition">
+                                            <div className="font-semibold">Fill in the Blanks (R&W)</div>
+                                            <div className="text-sm text-gray-600">Select from dropdown</div>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Listening */}
+                                <div className="bg-white p-6 rounded-xl card-shadow">
+                                    <h2 className="text-2xl font-bold mb-4 flex items-center">
+                                        <span className="text-3xl mr-3">🎧</span>
+                                        Listening
+                                    </h2>
+                                    <div className="space-y-2">
+                                        <button onClick={() => startPractice('listening', 'summarizeSpokenText')} className="w-full p-3 text-left bg-orange-50 hover:bg-orange-100 rounded-lg transition">
+                                            <div className="font-semibold">Summarize Spoken Text</div>
+                                            <div className="text-sm text-gray-600">Write 50-70 word summary</div>
+                                        </button>
+                                        <button onClick={() => startPractice('listening', 'multipleChoiceListening')} className="w-full p-3 text-left bg-orange-50 hover:bg-orange-100 rounded-lg transition">
+                                            <div className="font-semibold">Multiple Choice</div>
+                                            <div className="text-sm text-gray-600">Choose correct answer(s)</div>
+                                        </button>
+                                        <button onClick={() => startPractice('listening', 'fillBlanksListening')} className="w-full p-3 text-left bg-orange-50 hover:bg-orange-100 rounded-lg transition">
+                                            <div className="font-semibold">Fill in the Blanks</div>
+                                            <div className="text-sm text-gray-600">Complete missing words</div>
+                                        </button>
+                                        <button onClick={() => startPractice('listening', 'highlightCorrectSummary')} className="w-full p-3 text-left bg-orange-50 hover:bg-orange-100 rounded-lg transition">
+                                            <div className="font-semibold">Highlight Correct Summary</div>
+                                            <div className="text-sm text-gray-600">Choose best summary</div>
+                                        </button>
+                                        <button onClick={() => startPractice('listening', 'selectMissingWord')} className="w-full p-3 text-left bg-orange-50 hover:bg-orange-100 rounded-lg transition">
+                                            <div className="font-semibold">Select Missing Word</div>
+                                            <div className="text-sm text-gray-600">Complete the audio</div>
+                                        </button>
+                                        <button onClick={() => startPractice('listening', 'highlightIncorrectWords')} className="w-full p-3 text-left bg-orange-50 hover:bg-orange-100 rounded-lg transition">
+                                            <div className="font-semibold">Highlight Incorrect Words</div>
+                                            <div className="text-sm text-gray-600">Find transcription errors</div>
+                                        </button>
+                                        <button onClick={() => startPractice('listening', 'writeFromDictation')} className="w-full p-3 text-left bg-orange-50 hover:bg-orange-100 rounded-lg transition">
+                                            <div className="font-semibold">Write from Dictation</div>
+                                            <div className="text-sm text-gray-600">Type exact sentence</div>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                }
+
+                // Render practice question
+                return (
+                    <div className="max-w-4xl mx-auto px-4 py-8">
+                        <div className="bg-white p-8 rounded-xl card-shadow">
+                            <div className="flex justify-between items-center mb-6">
+                                <div>
+                                    <h2 className="text-3xl font-bold capitalize">{currentPractice.section} - {currentPractice.questionType.replace(/([A-Z])/g, ' $1').trim()}</h2>
+                                    <div className="text-sm text-gray-600 mt-1">Difficulty: {currentPractice.question.difficulty}</div>
+                                </div>
+                                <button onClick={resetPractice} className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition">
+                                    ← Back
+                                </button>
+                            </div>
+
+                            {/* Question Display */}
+                            <div className="bg-gray-50 p-6 rounded-lg mb-6">
+                                {currentPractice.questionType === 'readAloud' && (
+                                    <div>
+                                        <h3 className="font-bold mb-3">Read the text aloud:</h3>
+                                        <p className="text-lg leading-relaxed">{currentPractice.question.text}</p>
+                                    </div>
+                                )}
+                                
+                                {currentPractice.questionType === 'describeImage' && (
+                                    <div>
+                                        <h3 className="font-bold mb-3">Describe this image in detail:</h3>
+                                        <p className="text-gray-700 mb-4">{currentPractice.question.description}</p>
+                                        <div className="text-sm text-gray-600">Key points to cover: {currentPractice.question.keywords.join(', ')}</div>
+                                    </div>
+                                )}
+
+                                {currentPractice.questionType === 'retellLecture' && (
+                                    <div>
+                                        <h3 className="font-bold mb-3">Listen to the lecture and retell it:</h3>
+                                        <div className="bg-white p-4 rounded border">
+                                            <p className="text-gray-700">{currentPractice.question.lecture}</p>
+                                        </div>
+                                        <div className="text-sm text-gray-600 mt-2">🎧 Imagine you heard this lecture. Retell it in your own words.</div>
+                                    </div>
+                                )}
+
+                                {currentPractice.questionType === 'answerShortQuestion' && (
+                                    <div>
+                                        <h3 className="font-bold mb-3">Answer this question in one or two words:</h3>
+                                        <p className="text-lg">{currentPractice.question.question}</p>
+                                    </div>
+                                )}
+
+                                {currentPractice.questionType === 'writeEssay' && (
+                                    <div>
+                                        <h3 className="font-bold mb-3">Write an essay (200-300 words) on this topic:</h3>
+                                        <p className="text-lg mb-4">{currentPractice.question.prompt}</p>
+                                        <div className="flex gap-4 text-sm text-gray-600">
+                                            <span>⏱️ Time: {currentPractice.question.timeLimit} minutes</span>
+                                            <span>📝 Words: {currentPractice.question.wordLimit}</span>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {currentPractice.questionType === 'summarizeText' && (
+                                    <div>
+                                        <h3 className="font-bold mb-3">Read the text and summarize it in one sentence ({currentPractice.question.wordLimit}):</h3>
+                                        <div className="bg-white p-4 rounded border max-h-64 overflow-y-auto">
+                                            <p className="text-gray-700">{currentPractice.question.text}</p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {currentPractice.questionType === 'summarizeSpokenText' && (
+                                    <div>
+                                        <h3 className="font-bold mb-3">Listen and write a summary ({currentPractice.question.wordLimit}):</h3>
+                                        <div className="bg-white p-4 rounded border">
+                                            <p className="text-gray-700">{currentPractice.question.audio}</p>
+                                        </div>
+                                        <div className="text-sm text-gray-600 mt-2">🎧 Imagine you heard this. Write a summary.</div>
+                                    </div>
+                                )}
+
+                                {currentPractice.questionType === 'multipleChoiceSingle' && (
+                                    <div>
+                                        <div className="bg-white p-4 rounded border mb-4">
+                                            <p className="text-gray-700 mb-4">{currentPractice.question.passage}</p>
+                                        </div>
+                                        <h3 className="font-bold mb-3">{currentPractice.question.question}</h3>
+                                        <div className="space-y-2">
+                                            {currentPractice.question.options.map((option, idx) => (
+                                                <label key={idx} className="flex items-center p-3 bg-white border rounded hover:bg-gray-50 cursor-pointer">
+                                                    <input
+                                                        type="radio"
+                                                        name="answer"
+                                                        value={idx}
+                                                        onChange={(e) => setUserAnswer(e.target.value)}
+                                                        className="mr-3"
+                                                    />
+                                                    <span>{option}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {currentPractice.questionType === 'multipleChoiceMultiple' && (
+                                    <div>
+                                        <div className="bg-white p-4 rounded border mb-4">
+                                            <p className="text-gray-700 mb-4">{currentPractice.question.passage}</p>
+                                        </div>
+                                        <h3 className="font-bold mb-3">{currentPractice.question.question}</h3>
+                                        <div className="space-y-2">
+                                            {currentPractice.question.options.map((option, idx) => (
+                                                <label key={idx} className="flex items-center p-3 bg-white border rounded hover:bg-gray-50 cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        value={idx}
+                                                        onChange={(e) => {
+                                                            const selected = userAnswer ? userAnswer.split(',').map(Number) : [];
+                                                            if (e.target.checked) {
+                                                                selected.push(idx);
+                                                            } else {
+                                                                const index = selected.indexOf(idx);
+                                                                if (index > -1) selected.splice(index, 1);
+                                                            }
+                                                            setUserAnswer(selected.join(','));
+                                                        }}
+                                                        className="mr-3"
+                                                    />
+                                                    <span>{option}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {currentPractice.questionType === 'reorderParagraphs' && (
+                                    <div>
+                                        <h3 className="font-bold mb-3">Drag and arrange these sentences in the correct order:</h3>
+                                        <div className="bg-yellow-50 p-4 rounded-lg mb-4">
+                                            <p className="text-sm text-yellow-800">💡 <strong>Tip:</strong> For now, type the correct order as numbers (e.g., "2,1,3,4")</p>
+                                        </div>
+                                        <div className="space-y-3 mb-4">
+                                            {currentPractice.question.sentences.map((sentence, idx) => (
+                                                <div key={idx} className="p-4 bg-white border rounded-lg">
+                                                    <span className="font-bold text-purple-600 mr-2">Sentence {idx + 1}:</span>
+                                                    <span className="text-gray-700">{sentence}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <input
+                                            type="text"
+                                            value={userAnswer}
+                                            onChange={(e) => setUserAnswer(e.target.value)}
+                                            placeholder="Enter order (e.g., 2,1,3,4)"
+                                            className="w-full p-4 border rounded-lg focus:ring-2 focus:ring-green-500"
+                                        />
+                                    </div>
+                                )}
+
+                                {currentPractice.questionType === 'fillBlanksReading' && (
+                                    <div>
+                                        <h3 className="font-bold mb-3">Choose the correct words to fill in the blanks:</h3>
+                                        <div className="bg-white p-4 rounded border mb-4">
+                                            <p className="text-gray-700 text-lg leading-relaxed whitespace-pre-wrap">{currentPractice.question.text}</p>
+                                        </div>
+                                        <div className="space-y-4">
+                                            {currentPractice.question.blanks.map((blank, idx) => (
+                                                <div key={idx} className="p-4 bg-gray-50 rounded-lg">
+                                                    <p className="font-bold mb-2">Blank {idx + 1}:</p>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {blank.options.map((option, optIdx) => (
+                                                            <button
+                                                                key={optIdx}
+                                                                onClick={() => {
+                                                                    const answers = userAnswer ? userAnswer.split(',') : [];
+                                                                    answers[idx] = optIdx.toString();
+                                                                    setUserAnswer(answers.join(','));
+                                                                }}
+                                                                className={`px-4 py-2 rounded-lg border transition ${
+                                                                    userAnswer.split(',')[idx] === optIdx.toString()
+                                                                        ? 'bg-purple-600 text-white'
+                                                                        : 'bg-white hover:bg-gray-100'
+                                                                }`}
+                                                            >
+                                                                {option}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {currentPractice.questionType === 'fillBlanksReadingWriting' && (
+                                    <div>
+                                        <h3 className="font-bold mb-3">Select the correct words from the dropdown to complete the text:</h3>
+                                        <div className="bg-white p-4 rounded border mb-4">
+                                            <p className="text-gray-700 text-lg leading-relaxed mb-4">{currentPractice.question.text}</p>
+                                        </div>
+                                        <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                                            <p className="font-bold mb-2">Available words:</p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {currentPractice.question.options.map((word, idx) => (
+                                                    <span key={idx} className="px-3 py-1 bg-white border rounded-full text-sm">
+                                                        {word}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <textarea
+                                            value={userAnswer}
+                                            onChange={(e) => setUserAnswer(e.target.value)}
+                                            placeholder="Type the missing words in order, separated by commas..."
+                                            className="w-full p-4 border rounded-lg focus:ring-2 focus:ring-green-500"
+                                            rows="3"
+                                        />
+                                    </div>
+                                )}
+
+                                {currentPractice.questionType === 'multipleChoiceListening' && (
+                                    <div>
+                                        <div className="bg-white p-4 rounded border mb-4">
+                                            <p className="text-gray-700 mb-4">🎧 Audio transcript: {currentPractice.question.audio}</p>
+                                        </div>
+                                        <h3 className="font-bold mb-3">{currentPractice.question.question}</h3>
+                                        <div className="space-y-2">
+                                            {currentPractice.question.options.map((option, idx) => (
+                                                <label key={idx} className="flex items-center p-3 bg-white border rounded hover:bg-gray-50 cursor-pointer">
+                                                    <input
+                                                        type="radio"
+                                                        name="answer"
+                                                        value={idx}
+                                                        onChange={(e) => setUserAnswer(e.target.value)}
+                                                        className="mr-3"
+                                                    />
+                                                    <span>{option}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {currentPractice.questionType === 'fillBlanksListening' && (
+                                    <div>
+                                        <h3 className="font-bold mb-3">Listen and fill in the missing words:</h3>
+                                        <div className="bg-white p-4 rounded border mb-4">
+                                            <p className="text-gray-700">🎧 Audio: {currentPractice.question.audio}</p>
+                                        </div>
+                                        <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                                            <p className="text-gray-700 text-lg">{currentPractice.question.text}</p>
+                                        </div>
+                                        <textarea
+                                            value={userAnswer}
+                                            onChange={(e) => setUserAnswer(e.target.value)}
+                                            placeholder="Type the missing words separated by commas..."
+                                            className="w-full p-4 border rounded-lg focus:ring-2 focus:ring-orange-500"
+                                            rows="3"
+                                        />
+                                    </div>
+                                )}
+
+                                {currentPractice.questionType === 'highlightCorrectSummary' && (
+                                    <div>
+                                        <h3 className="font-bold mb-3">Listen and select the best summary:</h3>
+                                        <div className="bg-white p-4 rounded border mb-4">
+                                            <p className="text-gray-700">🎧 Audio: {currentPractice.question.audio}</p>
+                                        </div>
+                                        <div className="space-y-2">
+                                            {currentPractice.question.summaries.map((summary, idx) => (
+                                                <label key={idx} className="flex items-start p-3 bg-white border rounded hover:bg-gray-50 cursor-pointer">
+                                                    <input
+                                                        type="radio"
+                                                        name="answer"
+                                                        value={idx}
+                                                        onChange={(e) => setUserAnswer(e.target.value)}
+                                                        className="mr-3 mt-1"
+                                                    />
+                                                    <span>{summary}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {currentPractice.questionType === 'selectMissingWord' && (
+                                    <div>
+                                        <h3 className="font-bold mb-3">Listen and select the missing word at the end:</h3>
+                                        <div className="bg-white p-4 rounded border mb-4">
+                                            <p className="text-gray-700">🎧 Audio: {currentPractice.question.audio}</p>
+                                        </div>
+                                        <div className="space-y-2">
+                                            {currentPractice.question.options.map((option, idx) => (
+                                                <label key={idx} className="flex items-center p-3 bg-white border rounded hover:bg-gray-50 cursor-pointer">
+                                                    <input
+                                                        type="radio"
+                                                        name="answer"
+                                                        value={idx}
+                                                        onChange={(e) => setUserAnswer(e.target.value)}
+                                                        className="mr-3"
+                                                    />
+                                                    <span>{option}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {currentPractice.questionType === 'highlightIncorrectWords' && (
+                                    <div>
+                                        <h3 className="font-bold mb-3">Listen to the audio and identify the words in the transcript that are different:</h3>
+                                        <div className="bg-white p-4 rounded border mb-4">
+                                            <p className="text-gray-700 mb-3">🎧 Audio: {currentPractice.question.audio}</p>
+                                            <p className="text-gray-700"><strong>Transcript:</strong> {currentPractice.question.transcript}</p>
+                                        </div>
+                                        <div className="bg-yellow-50 p-4 rounded-lg mb-4">
+                                            <p className="text-sm text-yellow-800">💡 <strong>Tip:</strong> The incorrect words are at positions: {currentPractice.question.incorrectWords.join(', ')}</p>
+                                        </div>
+                                        <textarea
+                                            value={userAnswer}
+                                            onChange={(e) => setUserAnswer(e.target.value)}
+                                            placeholder="Type the incorrect words you heard, separated by commas..."
+                                            className="w-full p-4 border rounded-lg focus:ring-2 focus:ring-orange-500"
+                                            rows="2"
+                                        />
+                                    </div>
+                                )}
+
+                                {currentPractice.questionType === 'writeFromDictation' && (
+                                    <div>
+                                        <h3 className="font-bold mb-3">Listen and write the exact sentence you hear:</h3>
+                                        <div className="bg-white p-4 rounded border mb-4">
+                                            <p className="text-gray-700">🎧 Audio: {currentPractice.question.audio}</p>
+                                        </div>
+                                        <textarea
+                                            value={userAnswer}
+                                            onChange={(e) => setUserAnswer(e.target.value)}
+                                            placeholder="Type exactly what you heard..."
+                                            className="w-full p-4 border rounded-lg focus:ring-2 focus:ring-orange-500"
+                                            rows="3"
+                                        />
+                                    </div>
+                                )}
+
+                                {currentPractice.questionType === 'repeatSentence' && (
+                                    <div>
+                                        <h3 className="font-bold mb-3">Listen and repeat the sentence exactly:</h3>
+                                        <div className="bg-white p-4 rounded border mb-4">
+                                            <p className="text-gray-700">🎧 Audio: "{currentPractice.question.audio}"</p>
+                                        </div>
+                                        <div className="bg-blue-50 p-4 rounded-lg mb-4">
+                                            <p className="text-sm text-blue-800">💡 Listen carefully, then record yourself repeating it word-for-word.</p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Answer Input */}
+                            {!practiceResult && (
+                                <div className="mb-6">
+                                    {(currentPractice.section === 'speaking') && (
+                                        <div>
+                                            <h3 className="font-bold mb-3">Record Your Response:</h3>
+                                            <div className="flex gap-4 items-center mb-4">
+                                                <button
+                                                    onClick={isRecording ? stopRecording : startRecording}
+                                                    className={`px-6 py-3 rounded-lg font-semibold transition ${
+                                                        isRecording 
+                                                            ? 'bg-red-500 hover:bg-red-600 text-white recording' 
+                                                            : 'bg-purple-600 hover:bg-purple-700 text-white'
+                                                    }`}
+                                                >
+                                                    {isRecording ? '🔴 Stop Recording' : '🎤 Start Recording'}
+                                                </button>
+                                                {recordedAudio && (
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-green-600">✅ Recorded</span>
+                                                        <audio src={recordedAudio} controls className="h-10" />
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="bg-blue-50 p-4 rounded-lg mb-4">
+                                                <p className="text-sm text-blue-800">💡 <strong>Tip:</strong> After recording, type what you said below so the AI can evaluate your content and pronunciation.</p>
+                                            </div>
+                                            <textarea
+                                                value={userAnswer}
+                                                onChange={(e) => setUserAnswer(e.target.value)}
+                                                placeholder="Type your spoken response here for evaluation..."
+                                                className="w-full p-4 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                                rows="4"
+                                            />
+                                        </div>
+                                    )}
+
+                                    {(currentPractice.section === 'writing' || (currentPractice.section === 'listening' && !['multipleChoiceListening', 'highlightCorrectSummary', 'selectMissingWord'].includes(currentPractice.questionType))) && (
+                                        <div>
+                                            <h3 className="font-bold mb-3">Your Answer:</h3>
+                                            <textarea
+                                                value={userAnswer}
+                                                onChange={(e) => setUserAnswer(e.target.value)}
+                                                placeholder="Type your answer here..."
+                                                className="w-full p-4 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                rows="8"
+                                            />
+                                            <div className="text-sm text-gray-600 mt-2">
+                                                Word count: {userAnswer.split(/\s+/).filter(w => w.length > 0).length}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {currentPractice.section === 'reading' && !['multipleChoiceSingle', 'multipleChoiceMultiple', 'reorderParagraphs', 'fillBlanksReading', 'fillBlanksReadingWriting'].includes(currentPractice.questionType) && (
+                                        <div>
+                                            <h3 className="font-bold mb-3">Your Answer:</h3>
+                                            <input
+                                                type="text"
+                                                value={userAnswer}
+                                                onChange={(e) => setUserAnswer(e.target.value)}
+                                                placeholder="Type your answer..."
+                                                className="w-full p-4 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                            />
+                                        </div>
+                                    )}
+
+                                    <button
+                                        onClick={handleSubmit}
+                                        disabled={isEvaluating}
+                                        className="w-full mt-6 py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold rounded-lg hover:from-purple-700 hover:to-blue-700 transition disabled:opacity-50"
+                                    >
+                                        {isEvaluating ? 'Evaluating with AI... ⏳' : 'Submit for Evaluation 🚀'}
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Results */}
+                            {practiceResult && (
+                                <div className="bg-gradient-to-r from-green-50 to-blue-50 p-6 rounded-xl">
+                                    <h3 className="text-2xl font-bold mb-4">Evaluation Results 🎉</h3>
+                                    
+                                    <div className="bg-white p-6 rounded-lg mb-6">
+                                        <div className="text-center mb-4">
+                                            <div className="text-5xl font-bold text-purple-600 mb-2">
+                                                {practiceResult.overallScore}
+                                            </div>
+                                            <div className="text-gray-600">Overall Score (0-90 scale)</div>
+                                            <div className="mt-2">
+                                                {practiceResult.overallScore >= 80 ? '🌟 Excellent!' : 
+                                                 practiceResult.overallScore >= 65 ? '✅ Good work!' : 
+                                                 '💪 Keep practicing!'}
+                                            </div>
+                                        </div>
+
+                                        {/* Detailed Scores */}
+                                        {practiceResult.contentScore !== undefined && (
+                                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
+                                                {practiceResult.contentScore !== undefined && (
+                                                    <div className="text-center p-3 bg-gray-50 rounded">
+                                                        <div className="font-bold text-lg">{practiceResult.contentScore}/10</div>
+                                                        <div className="text-sm text-gray-600">Content</div>
+                                                    </div>
+                                                )}
+                                                {practiceResult.pronunciationScore !== undefined && (
+                                                    <div className="text-center p-3 bg-gray-50 rounded">
+                                                        <div className="font-bold text-lg">{practiceResult.pronunciationScore}/10</div>
+                                                        <div className="text-sm text-gray-600">Pronunciation</div>
+                                                    </div>
+                                                )}
+                                                {practiceResult.fluencyScore !== undefined && (
+                                                    <div className="text-center p-3 bg-gray-50 rounded">
+                                                        <div className="font-bold text-lg">{practiceResult.fluencyScore}/10</div>
+                                                        <div className="text-sm text-gray-600">Fluency</div>
+                                                    </div>
+                                                )}
+                                                {practiceResult.grammarScore !== undefined && (
+                                                    <div className="text-center p-3 bg-gray-50 rounded">
+                                                        <div className="font-bold text-lg">{practiceResult.grammarScore}/10</div>
+                                                        <div className="text-sm text-gray-600">Grammar</div>
+                                                    </div>
+                                                )}
+                                                {practiceResult.vocabularyScore !== undefined && (
+                                                    <div className="text-center p-3 bg-gray-50 rounded">
+                                                        <div className="font-bold text-lg">{practiceResult.vocabularyScore}/10</div>
+                                                        <div className="text-sm text-gray-600">Vocabulary</div>
+                                                    </div>
+                                                )}
+                                                {practiceResult.coherenceScore !== undefined && (
+                                                    <div className="text-center p-3 bg-gray-50 rounded">
+                                                        <div className="font-bold text-lg">{practiceResult.coherenceScore}/10</div>
+                                                        <div className="text-sm text-gray-600">Coherence</div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Feedback */}
+                                    <div className="bg-white p-6 rounded-lg mb-4">
+                                        <h4 className="font-bold text-lg mb-2">Detailed Feedback:</h4>
+                                        <p className="text-gray-700">{practiceResult.feedback}</p>
+                                    </div>
+
+                                    {/* Strengths */}
+                                    {practiceResult.strengths && practiceResult.strengths.length > 0 && (
+                                        <div className="bg-white p-6 rounded-lg mb-4">
+                                            <h4 className="font-bold text-lg mb-2 text-green-600">✅ Strengths:</h4>
+                                            <ul className="list-disc list-inside space-y-1">
+                                                {practiceResult.strengths.map((strength, idx) => (
+                                                    <li key={idx} className="text-gray-700">{strength}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+
+                                    {/* Improvements */}
+                                    {practiceResult.improvements && practiceResult.improvements.length > 0 && (
+                                        <div className="bg-white p-6 rounded-lg mb-4">
+                                            <h4 className="font-bold text-lg mb-2 text-orange-600">💡 Areas for Improvement:</h4>
+                                            <ul className="list-disc list-inside space-y-1">
+                                                {practiceResult.improvements.map((improvement, idx) => (
+                                                    <li key={idx} className="text-gray-700">{improvement}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+
+                                    <div className="flex gap-4">
+                                        <button
+                                            onClick={() => startPractice(currentPractice.section, currentPractice.questionType)}
+                                            className="flex-1 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition"
+                                        >
+                                            Try Another Question
+                                        </button>
+                                        <button
+                                            onClick={resetPractice}
+                                            className="flex-1 py-3 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition"
+                                        >
+                                            Back to Menu
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            };
+
+            // ==================== STUDY RESOURCES ====================
+            const Resources = () => {
+                const [selectedResource, setSelectedResource] = useState('speaking');
+
+                return (
+                    <div className="max-w-7xl mx-auto px-4 py-8">
+                        <h1 className="text-4xl font-bold text-gray-800 mb-8">Study Resources 📚</h1>
+
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                            {['speaking', 'writing', 'reading', 'listening', 'grammar'].map(section => (
+                                <button
+                                    key={section}
+                                    onClick={() => setSelectedResource(section)}
+                                    className={`p-4 rounded-xl font-semibold transition ${
+                                        selectedResource === section
+                                            ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white'
+                                            : 'bg-white text-gray-700 hover:bg-gray-100'
+                                    }`}
+                                >
+                                    {section.charAt(0).toUpperCase() + section.slice(1)}
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="bg-white p-8 rounded-xl card-shadow">
+                            {selectedResource !== 'grammar' ? (
+                                <>
+                                    <h2 className="text-3xl font-bold mb-6 capitalize">{selectedResource} Tips & Strategies</h2>
+                                    
+                                    <div className="mb-8">
+                                        <h3 className="text-xl font-bold mb-4">💡 Essential Tips</h3>
+                                        <div className="space-y-3">
+                                            {STUDY_RESOURCES[selectedResource].tips.map((tip, idx) => (
+                                                <div key={idx} className="flex items-start gap-3 p-4 bg-gray-50 rounded-lg">
+                                                    <span className="text-2xl">{idx + 1}.</span>
+                                                    <p className="text-gray-700">{tip}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {STUDY_RESOURCES[selectedResource].templates && (
+                                        <div className="mb-8">
+                                            <h3 className="text-xl font-bold mb-4">📝 Useful Templates</h3>
+                                            {Object.entries(STUDY_RESOURCES[selectedResource].templates).map(([key, template]) => (
+                                                <div key={key} className="mb-4 p-4 bg-blue-50 rounded-lg">
+                                                    <h4 className="font-bold mb-2 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</h4>
+                                                    <p className="text-gray-700 whitespace-pre-line">{template}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {STUDY_RESOURCES[selectedResource].essayStructure && (
+                                        <div className="mb-8">
+                                            <h3 className="text-xl font-bold mb-4">📊 Essay Structure (200-300 words)</h3>
+                                            <div className="p-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg">
+                                                <pre className="text-gray-700 whitespace-pre-line font-sans">
+                                                    {STUDY_RESOURCES[selectedResource].essayStructure}
+                                                </pre>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {STUDY_RESOURCES[selectedResource].summaryTips && (
+                                        <div className="mb-8">
+                                            <h3 className="text-xl font-bold mb-4">✍️ Summary Writing Tips</h3>
+                                            <div className="p-4 bg-yellow-50 rounded-lg">
+                                                <p className="text-gray-700">{STUDY_RESOURCES[selectedResource].summaryTips}</p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {STUDY_RESOURCES[selectedResource].strategies && (
+                                        <div className="mb-8">
+                                            <h3 className="text-xl font-bold mb-4">🎯 Reading Strategies</h3>
+                                            <div className="p-4 bg-green-50 rounded-lg">
+                                                <p className="text-gray-700 whitespace-pre-line">{STUDY_RESOURCES[selectedResource].strategies}</p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {STUDY_RESOURCES[selectedResource].noteTaking && (
+                                        <div className="mb-8">
+                                            <h3 className="text-xl font-bold mb-4">📝 Note-Taking System</h3>
+                                            <div className="p-4 bg-orange-50 rounded-lg">
+                                                <p className="text-gray-700 whitespace-pre-line">{STUDY_RESOURCES[selectedResource].noteTaking}</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <>
+                                    <h2 className="text-3xl font-bold mb-6">Grammar Guide</h2>
+                                    <div className="space-y-6">
+                                        {STUDY_RESOURCES.grammar.map((item, idx) => (
+                                            <div key={idx} className="p-6 bg-gray-50 rounded-lg">
+                                                <h3 className="text-xl font-bold mb-3">{item.topic}</h3>
+                                                <div className="mb-3">
+                                                    <strong className="text-purple-600">Rule:</strong>
+                                                    <p className="text-gray-700 mt-1">{item.rule}</p>
+                                                </div>
+                                                <div className="mb-3">
+                                                    <strong className="text-blue-600">Examples:</strong>
+                                                    <ul className="list-disc list-inside mt-1 space-y-1">
+                                                        {item.examples.map((example, eidx) => (
+                                                            <li key={eidx} className="text-gray-700">{example}</li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                                <div className="p-3 bg-yellow-50 rounded">
+                                                    <strong className="text-orange-600">Practice:</strong>
+                                                    <p className="text-gray-700 mt-1">{item.practice}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                );
+            };
+
+            // ==================== VOCABULARY BUILDER ====================
+            const VocabularyBuilder = () => {
+                const [currentWordIndex, setCurrentWordIndex] = useState(0);
+                const [showDefinition, setShowDefinition] = useState(false);
+                const [masteredWords, setMasteredWords] = useState(vocabularyProgress.mastered || []);
+
+                const currentWord = VOCABULARY_WORDS[currentWordIndex];
+
+                const markAsMastered = () => {
+                    if (!masteredWords.includes(currentWord.word)) {
+                        const updated = [...masteredWords, currentWord.word];
+                        setMasteredWords(updated);
+                        const newProgress = { ...vocabularyProgress, mastered: updated };
+                        setVocabularyProgress(newProgress);
+                        StorageManager.saveData('pte_vocabulary', newProgress);
+                    }
+                    nextWord();
+                };
+
+                const nextWord = () => {
+                    setShowDefinition(false);
+                    setCurrentWordIndex((currentWordIndex + 1) % VOCABULARY_WORDS.length);
+                };
+
+                const previousWord = () => {
+                    setShowDefinition(false);
+                    setCurrentWordIndex(currentWordIndex === 0 ? VOCABULARY_WORDS.length - 1 : currentWordIndex - 1);
+                };
+
+                return (
+                    <div className="max-w-4xl mx-auto px-4 py-8">
+                        <h1 className="text-4xl font-bold text-gray-800 mb-8">Vocabulary Builder 📖</h1>
+
+                        <div className="bg-white p-8 rounded-xl card-shadow mb-8">
+                            <div className="flex justify-between items-center mb-6">
+                                <div className="text-sm text-gray-600">
+                                    Word {currentWordIndex + 1} of {VOCABULARY_WORDS.length}
+                                </div>
+                                <div className="text-sm font-semibold text-purple-600">
+                                    Mastered: {masteredWords.length}/{VOCABULARY_WORDS.length}
+                                </div>
+                            </div>
+
+                            <div className="text-center mb-8">
+                                <h2 className="text-5xl font-bold text-purple-600 mb-4">
+                                    {currentWord.word}
+                                </h2>
+                                <div className="flex justify-center gap-4 text-sm">
+                                    <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full">
+                                        {currentWord.category}
+                                    </span>
+                                    <span className={`px-3 py-1 rounded-full ${
+                                        currentWord.difficulty === 'easy' ? 'bg-green-100 text-green-700' :
+                                        currentWord.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                                        'bg-red-100 text-red-700'
+                                    }`}>
+                                        {currentWord.difficulty}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={() => setShowDefinition(!showDefinition)}
+                                className="w-full py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold rounded-lg hover:from-purple-700 hover:to-blue-700 transition mb-6"
+                            >
+                                {showDefinition ? 'Hide' : 'Show'} Definition
+                            </button>
+
+                            {showDefinition && (
+                                <div className="space-y-4 animate-fadeIn">
+                                    <div className="p-6 bg-gray-50 rounded-lg">
+                                        <h3 className="font-bold text-lg mb-2">Definition:</h3>
+                                        <p className="text-gray-700 text-lg">{currentWord.definition}</p>
+                                    </div>
+                                    <div className="p-6 bg-blue-50 rounded-lg">
+                                        <h3 className="font-bold text-lg mb-2">Example:</h3>
+                                        <p className="text-gray-700 italic">"{currentWord.example}"</p>
+                                    </div>
+                                    <button
+                                        onClick={markAsMastered}
+                                        className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition"
+                                    >
+                                        {masteredWords.includes(currentWord.word) ? '✅ Already Mastered' : '✅ Mark as Mastered'}
+                                    </button>
+                                </div>
+                            )}
+
+                            <div className="flex gap-4 mt-6">
+                                <button
+                                    onClick={previousWord}
+                                    className="flex-1 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition"
+                                >
+                                    ← Previous
+                                </button>
+                                <button
+                                    onClick={nextWord}
+                                    className="flex-1 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition"
+                                >
+                                    Next →
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Mastered Words List */}
+                        {masteredWords.length > 0 && (
+                            <div className="bg-white p-6 rounded-xl card-shadow">
+                                <h2 className="text-2xl font-bold mb-4">Your Mastered Words 🌟</h2>
+                                <div className="flex flex-wrap gap-2">
+                                    {masteredWords.map((word, idx) => (
+                                        <span key={idx} className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm">
+                                            {word}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+            };
+
+            // ==================== STUDY PLANNER ====================
+            const StudyPlanner = () => {
+                const [newSession, setNewSession] = useState({
+                    date: new Date().toISOString().split('T')[0],
+                    time: '09:00',
+                    duration: 30,
+                    section: 'speaking',
+                    notes: ''
+                });
+
+                const addSession = () => {
+                    const session = {
+                        ...newSession,
+                        id: Date.now(),
+                        completed: false
+                    };
+                    const updated = [...studySchedule, session];
+                    setStudySchedule(updated);
+                    StorageManager.saveData('pte_schedule', updated);
+                    setNewSession({
+                        date: new Date().toISOString().split('T')[0],
+                        time: '09:00',
+                        duration: 30,
+                        section: 'speaking',
+                        notes: ''
+                    });
+                };
+
+                const toggleComplete = (id) => {
+                    const updated = studySchedule.map(s => 
+                        s.id === id ? { ...s, completed: !s.completed } : s
+                    );
+                    setStudySchedule(updated);
+                    StorageManager.saveData('pte_schedule', updated);
+                };
+
+                const deleteSession = (id) => {
+                    const updated = studySchedule.filter(s => s.id !== id);
+                    setStudySchedule(updated);
+                    StorageManager.saveData('pte_schedule', updated);
+                };
+
+                const upcomingSessions = studySchedule.filter(s => !s.completed && new Date(s.date) >= new Date().setHours(0,0,0,0)).sort((a, b) => new Date(a.date) - new Date(b.date));
+
+                return (
+                    <div className="max-w-4xl mx-auto px-4 py-8">
+                        <h1 className="text-4xl font-bold text-gray-800 mb-8">Study Planner 📅</h1>
+
+                        <div className="bg-white p-6 rounded-xl card-shadow mb-8">
+                            <h2 className="text-2xl font-bold mb-6">Schedule New Session</h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <div>
+                                    <label className="block text-sm font-semibold mb-2">Date</label>
+                                    <input
+                                        type="date"
+                                        value={newSession.date}
+                                        onChange={(e) => setNewSession({...newSession, date: e.target.value})}
+                                        className="w-full p-3 border rounded-lg"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold mb-2">Time</label>
+                                    <input
+                                        type="time"
+                                        value={newSession.time}
+                                        onChange={(e) => setNewSession({...newSession, time: e.target.value})}
+                                        className="w-full p-3 border rounded-lg"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold mb-2">Duration (minutes)</label>
+                                    <select
+                                        value={newSession.duration}
+                                        onChange={(e) => setNewSession({...newSession, duration: parseInt(e.target.value)})}
+                                        className="w-full p-3 border rounded-lg"
+                                    >
+                                        <option value={30}>30 minutes</option>
+                                        <option value={45}>45 minutes</option>
+                                        <option value={60}>60 minutes</option>
+                                        <option value={90}>90 minutes</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold mb-2">Section</label>
+                                    <select
+                                        value={newSession.section}
+                                        onChange={(e) => setNewSession({...newSession, section: e.target.value})}
+                                        className="w-full p-3 border rounded-lg"
+                                    >
+                                        <option value="speaking">Speaking</option>
+                                        <option value="writing">Writing</option>
+                                        <option value="reading">Reading</option>
+                                        <option value="listening">Listening</option>
+                                        <option value="vocabulary">Vocabulary</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="mb-4">
+                                <label className="block text-sm font-semibold mb-2">Notes (optional)</label>
+                                <input
+                                    type="text"
+                                    value={newSession.notes}
+                                    onChange={(e) => setNewSession({...newSession, notes: e.target.value})}
+                                    placeholder="E.g., Focus on pronunciation"
+                                    className="w-full p-3 border rounded-lg"
+                                />
+                            </div>
+                            <button
+                                onClick={addSession}
+                                className="w-full py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold rounded-lg hover:from-purple-700 hover:to-blue-700 transition"
+                            >
+                                Add to Schedule
+                            </button>
+                        </div>
+
+                        {/* Upcoming Sessions */}
+                        <div className="bg-white p-6 rounded-xl card-shadow mb-8">
+                            <h2 className="text-2xl font-bold mb-6">Upcoming Sessions</h2>
+                            {upcomingSessions.length === 0 ? (
+                                <p className="text-gray-600 text-center py-8">No upcoming sessions scheduled. Add one above!</p>
+                            ) : (
+                                <div className="space-y-3">
+                                    {upcomingSessions.map(session => (
+                                        <div key={session.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                            <div className="flex items-center gap-4">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={session.completed}
+                                                    onChange={() => toggleComplete(session.id)}
+                                                    className="w-5 h-5"
+                                                />
+                                                <div>
+                                                    <div className="font-semibold capitalize">{session.section}</div>
+                                                    <div className="text-sm text-gray-600">
+                                                        {new Date(session.date).toLocaleDateString()} at {session.time} ({session.duration} min)
+                                                    </div>
+                                                    {session.notes && <div className="text-sm text-gray-500 italic">{session.notes}</div>}
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => deleteSession(session.id)}
+                                                className="text-red-500 hover:text-red-700 font-semibold"
+                                            >
+                                                Delete
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Completed Sessions */}
+                        {studySchedule.filter(s => s.completed).length > 0 && (
+                            <div className="bg-white p-6 rounded-xl card-shadow">
+                                <h2 className="text-2xl font-bold mb-6">Completed Sessions ✅</h2>
+                                <div className="space-y-2">
+                                    {studySchedule.filter(s => s.completed).map(session => (
+                                        <div key={session.id} className="p-3 bg-green-50 rounded-lg flex items-center justify-between">
+                                            <div>
+                                                <span className="font-semibold capitalize">{session.section}</span>
+                                                <span className="text-sm text-gray-600 ml-2">
+                                                    - {new Date(session.date).toLocaleDateString()}
+                                                </span>
+                                            </div>
+                                            <button
+                                                onClick={() => deleteSession(session.id)}
+                                                className="text-gray-400 hover:text-gray-600 text-sm"
+                                            >
+                                                Remove
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+            };
+
+            // ==================== PROGRESS TRACKING ====================
+            const ProgressTracking = () => {
+                const chartRef = useRef(null);
+                const chartInstance = useRef(null);
+
+                useEffect(() => {
+                    if (scores.length > 0 && chartRef.current) {
+                        const ctx = chartRef.current.getContext('2d');
+                        
+                        if (chartInstance.current) {
+                            chartInstance.current.destroy();
+                        }
+
+                        const sortedScores = [...scores].sort((a, b) => new Date(a.date) - new Date(b.date));
+                        
+                        chartInstance.current = new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: sortedScores.map(s => new Date(s.date).toLocaleDateString()),
+                                datasets: [{
+                                    label: 'Overall Score',
+                                    data: sortedScores.map(s => s.score),
+                                    borderColor: 'rgb(147, 51, 234)',
+                                    backgroundColor: 'rgba(147, 51, 234, 0.1)',
+                                    tension: 0.4
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                scales: {
+                                    y: {
+                                        beginAtZero: true,
+                                        max: 90,
+                                        ticks: {
+                                            stepSize: 10
+                                        }
+                                    }
+                                },
+                                plugins: {
+                                    legend: {
+                                        display: true
+                                    }
+                                }
+                            }
+                        });
+                    }
+
+                    return () => {
+                        if (chartInstance.current) {
+                            chartInstance.current.destroy();
+                        }
+                    };
+                }, [scores]);
+
+                const recentScores = [...scores].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 10);
+
+                return (
+                    <div className="max-w-7xl mx-auto px-4 py-8">
+                        <h1 className="text-4xl font-bold text-gray-800 mb-8">Progress Tracking 📈</h1>
+
+                        {scores.length === 0 ? (
+                            <div className="bg-white p-12 rounded-xl card-shadow text-center">
+                                <div className="text-6xl mb-4">📊</div>
+                                <h2 className="text-2xl font-bold mb-2">No practice data yet</h2>
+                                <p className="text-gray-600 mb-6">Start practicing to see your progress!</p>
+                                <button
+                                    onClick={() => setCurrentSection('practice')}
+                                    className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition"
+                                >
+                                    Start Practice
+                                </button>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="bg-white p-6 rounded-xl card-shadow mb-8">
+                                    <h2 className="text-2xl font-bold mb-6">Score Progression</h2>
+                                    <canvas ref={chartRef}></canvas>
+                                </div>
+
+                                <div className="bg-white p-6 rounded-xl card-shadow">
+                                    <h2 className="text-2xl font-bold mb-6">Recent Practice Results</h2>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full">
+                                            <thead>
+                                                <tr className="border-b">
+                                                    <th className="text-left py-3 px-4">Date</th>
+                                                    <th className="text-left py-3 px-4">Section</th>
+                                                    <th className="text-left py-3 px-4">Question Type</th>
+                                                    <th className="text-left py-3 px-4">Score</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {recentScores.map((score) => (
+                                                    <tr key={score.id} className="border-b hover:bg-gray-50">
+                                                        <td className="py-3 px-4">{new Date(score.date).toLocaleDateString()}</td>
+                                                        <td className="py-3 px-4 capitalize">{score.section}</td>
+                                                        <td className="py-3 px-4 capitalize">{score.details.questionType}</td>
+                                                        <td className="py-3 px-4">
+                                                            <span className={`font-bold ${
+                                                                score.score >= 80 ? 'text-green-600' :
+                                                                score.score >= 65 ? 'text-yellow-600' :
+                                                                'text-red-600'
+                                                            }`}>
+                                                                {score.score}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                );
+            };
+
+            // ==================== MAIN RENDER ====================
+            return (
+                <div className="min-h-screen bg-gray-50">
+                    <NavBar />
+                    {currentSection === 'dashboard' && <Dashboard />}
+                    {currentSection === 'practice' && <PracticeMode />}
+                    {currentSection === 'resources' && <Resources />}
+                    {currentSection === 'vocabulary' && <VocabularyBuilder />}
+                    {currentSection === 'planner' && <StudyPlanner />}
+                    {currentSection === 'progress' && <ProgressTracking />}
+                </div>
+            );
+        }
+
+        ReactDOM.render(<PTETracker />, document.getElementById('root'));
+    </script>
+</body>
+</html>
